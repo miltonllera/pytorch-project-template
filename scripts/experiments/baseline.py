@@ -1,5 +1,5 @@
 import sys
-from sacred.observers import MongoObserver
+from sacred.observers import FileStorageObserver
 
 sys.path.insert(0, '../../src')
 
@@ -17,8 +17,7 @@ ex, run_experiment = create_experiment(
         Config(name='sublstm', config='configs/baseline-sublstm.yaml'),
         Config(name='lstm', config='configs/baseline-lstm.yaml')],
     observers=[
-        MongoObserver.create(url='127.0.0.1:27017',
-                            db_name='deladd')]
+        FileStorageObserver('../../data/sims/')]
     )
 
 
