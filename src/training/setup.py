@@ -8,7 +8,7 @@ from .engine import create_rnn_trainer, create_rnn_evaluator
 from .handlers import Tracer, ModelCheckpoint, EarlyStopping, \
     Timer, LRScheduler, ProgressLog
 from .optimizer import init_optimizer, init_lr_scheduler
-from .loss import RNNLossWrapper, RateDecay, ComposedLoss
+from .loss import init_metrics
 
 
 def set_seed_and_device(seed, no_cuda):
@@ -24,19 +24,13 @@ def set_seed_and_device(seed, no_cuda):
 
 
 def setup_training(
-        model, validation_data, optim, lr, l2_norm, rate_reg,
-        clip, early_stopping,  decay_lr, lr_scale, lr_decay_patience,
-        keep_hidden, save, device, trace=False, time=False
+        model, validation_data, optim, metrics, lr, l2_norm,
+        rate_reg, clip, early_stopping, decay_lr, lr_scale, 
+        lr_decay_patience, keep_hidden, save, device, trace=False, time=False
     ):
 
-    criterion = nn.MSELoss()
-    metrics = {'mse': Loss(criterion)}
-    loss = RNNLossWrapper(criterion)
-    if rate_reg > 0:
-        loss = ComposedLoss(
-            terms=[loss, RateDacay(device=device)],
-            decays=[1.0, rate_reg]
-        )
+    loss_fn_name = metrics[0]
+    loss, metrics = init_metrics(metrics, rnn_eval=True)
 
     optimizer = init_optimizer(
         optim, model.parameters(), lr, l2_norm)
@@ -67,8 +61,8 @@ def setup_training(
 
     # Add handlers. Learning rate decay
     if decay_lr:
-        lr_scheduler = hdlr.LRScheduler(
-            loss='mse', scheduler=init_lr_scheduler(
+        lr_scheduler = LRScheduler(
+            loss=loss_fn_name, scheduler=init_lr_scheduler(
                                         optimizer, 'reduce-on-plateau',
                                         lr_decay=lr_scale,
                                         patience=lr_decay_patience))
@@ -76,7 +70,7 @@ def setup_training(
 
     # Model checkpoint and early stopping
     def score_fn(engine):
-        return -engine.state.metrics['mse']
+        return -engine.state.metrics[loss_fn_name]
 
     checkpoint = ModelCheckpoint(
         dirname=save,
@@ -91,7 +85,7 @@ def setup_training(
 
     if early_stopping:
         stopper = EarlyStopping(
-            patience=100,
+            patience=early_stopping,
             score_function=score_fn,
             trainer=trainer
         )

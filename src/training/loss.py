@@ -1,7 +1,8 @@
 import torch
+import torch.nn as nn
 import torch.nn.modules.loss as L
 import torch.nn.functional as F
-import ignite.metrics as metrics
+import ignite.metrics as M
 
 
 class RNNLossWrapper(L._Loss):
@@ -49,3 +50,39 @@ class ComposedLoss(L._Loss):
             value += w * term(input, target)
 
         return value
+
+
+def get_loss_fn(loss_fn_name):
+    if loss_fn_name == 'mse':
+        return nn.MSELoss()
+    elif loss_fn_name == 'xent':
+        return nn.CrossEntropyLoss()
+    else:
+        raise ValueError('Unknown loss function {}'.format(loss_fn_name))
+
+
+def get_metric(metric):
+    if metric == 'mse':
+        return M.MeanSquaredError()
+    elif metric == 'xent':
+        return M.Loss(nn.CrossEntropyLoss())
+    elif metric == 'acc':
+        return M.Accuracy()
+    raise ValueError('Unrecognized metric {}.'.format(metric))
+
+
+def init_metrics(metrics, rate_reg=0.0, rnn_eval=True):
+    criterion = get_loss_fn(metrics[0])
+
+    if rnn_eval:
+        criterion = RNNLossWrapper(criterion)
+
+    if rate_reg > 0:
+        criterion = ComposedLoss(
+            terms=[criterion, RateDacay(device=device)],
+            decays=[1.0, rate_reg]
+        )
+
+    metrics = {m: get_metric(m) for m in metrics}
+
+    return criterion, metrics

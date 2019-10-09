@@ -3,9 +3,16 @@ import pandas as pd
 from itertools import chain
 
 import torch
+import torch.nn as nn
+from scipy.stats import pearsonr
 from sklearn.decomposition import PCA
-from sklearn.manifold import TSNE
+from sklearn.cross_decomposition import CCA
+from sklearn.manifold import TSNE, MDS
 from sklearn.linear_model import LogisticRegression
+from itertools import product, combinations
+
+from ignite.engine import Engine, Events, _prepare_batch
+from .recording import create_activity_recorder
 
 
 def temporal_pca(data, n_components=None, random_state=None, z_score=True):
@@ -63,3 +70,65 @@ def tsne_projection(data, n_components=2, perplexity=30.0):
     )
 
     return X_proj
+
+
+def get_encoding_act(model, data, device):
+    recorder = create_activity_recorder(model, device)
+    recorder.run(data)
+    hidden_recs = np.concatenate(recorder.state.hidden, axis=0)
+#     memcell_recs = np.concatenate(recorder.state.hidden, axis=0)
+    return hidden_recs
+
+
+def encoding_pca(data, n_components=0.95):
+    pca = PCA(
+        n_components=n_components,
+        copy=False, whiten=True,
+    ).fit(X=data)
+    
+    data_proj = pca.transform(data)
+    
+    components = range(1, pca.n_components_ + 1)    
+
+    X_proj = pd.Series(
+        name='activation projection',
+        data=data_proj.reshape(-1),
+        index=pd.MultiIndex.from_product(
+            [list(range(data.shape[0])), components],
+            names=['instances', 'component']
+        ))
+    
+    return X_proj, pca
+
+
+def similarity_matrix(recordings):
+    corrcoef, p_values = [], []
+    
+    for X, Y in combinations(recordings, r=2):
+        n_components = min(X.shape[1], Y.shape[1])
+        cca = CCA(n_components=n_components, max_iter=1000).fit(X, Y)
+        X_c, Y_c = cca.transform(X, Y)
+        X_c, Y_c = X_c.squeeze(), Y_c.squeeze()
+
+        if len(X_c.shape) == 1:
+            X_c = np.expand_dims(X_c, -1)
+        if len(Y_c.shape) == 1:
+            Y_c = np.expand_dims(Y_c, -1)
+
+        cc = [pearsonr(x, y) for x, y in zip(X_c.T, Y_c.T)]
+        corrcoef.append(np.mean(cc))
+        
+    m = len(recordings)
+            
+    corrmat = np.diag(np.ones(m))
+    corrmat[np.triu_indices(m, k=1)] = corrcoef
+    corrmat[np.tril_indices(m, k=-1)] = corrmat.T[np.tril_indices(m, k=-1)]
+    
+    return corrmat
+
+
+def project_data(mat):
+    mds = MDS(n_components=2, max_iter=3000, eps=1e-9, random_state=12213,
+                   dissimilarity="precomputed", n_jobs=1)
+    embedding = mds.fit_transform(1.0-mat)
+    return embedding
