@@ -71,8 +71,8 @@ def get_metric(metric):
     raise ValueError('Unrecognized metric {}.'.format(metric))
 
 
-def init_metrics(metrics, rate_reg=0.0, rnn_eval=True):
-    criterion = get_loss_fn(metrics[0])
+def init_metrics(loss, metrics, rate_reg=0.0, rnn_eval=True):
+    criterion = get_loss_fn(loss)
 
     if rnn_eval:
         criterion = RNNLossWrapper(criterion)

@@ -76,11 +76,9 @@ def weight_init_(rnn, mode=None, **kwargs):
                 'Unrecognised weight initialisation method {}'.format(mode))
 
 
-def init_model(model_type, hidden_size, input_size, n_layers,
-        output_size, dropout=0.0, weight_init=None, device='cpu',
-        predict_last=True
-    ):
-    if model_type == 'RNN':
+def init_rnn(rnn_type, hidden_size, input_size, n_layers, output_size,
+             dropout=0.0, weight_init=None, predict_last=True):
+    if rnn_type == 'RNN':
         rnn = nn.RNN(
             input_size=input_size,
             hidden_size=hidden_size,
@@ -89,7 +87,7 @@ def init_model(model_type, hidden_size, input_size, n_layers,
             dropout=dropout
         )
 
-    elif model_type == 'LSTM':
+    elif rnn_type == 'LSTM':
         rnn = nn.LSTM(
             input_size=input_size,
             hidden_size=hidden_size,
@@ -98,7 +96,7 @@ def init_model(model_type, hidden_size, input_size, n_layers,
             dropout=dropout
         )
 
-    elif model_type == 'GRU':
+    elif rnn_type == 'GRU':
         rnn = nn.GRU(
             input_size=input_size,
             hidden_size=hidden_size,
@@ -116,7 +114,7 @@ def init_model(model_type, hidden_size, input_size, n_layers,
         rnn=rnn,
         output_size = output_size,
         predict_last=predict_last
-    ).to(device=device)
+    )
 
     return model
 

@@ -95,21 +95,3 @@ def create_rnn_evaluator(model, metrics, device=None, hidden=None, non_blocking=
         metric.attach(engine, name)
 
     return engine
-
-
-def run_training(
-        model, train_data, trainer, epochs,
-        metrics, test_data, model_checkpoint, device
-    ):
-    trainer.run(train_data, max_epochs=epochs)
-
-    # Select best model
-    best_model_path = str(model_checkpoint._saved[-1][1][0])
-    with open(best_model_path, mode='rb') as f:
-        state_dict = torch.load(f)
-    model.load_state_dict(state_dict)
-
-    tester = create_rnn_evaluator(model, metrics, device=device)
-    tester.run(test_data)
-
-    return tester.state.metrics
